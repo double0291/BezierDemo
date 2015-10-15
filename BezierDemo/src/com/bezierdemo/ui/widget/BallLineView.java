@@ -72,6 +72,7 @@ public class BallLineView extends View {
     protected void onDraw(Canvas canvas) {
         if (!mHasInitStaticBalls) {
             initBalls();
+            mHasInitStaticBalls = true;
         }
         // 计算动态小球的x
         mDynamicBall.x = mDynamicMinX + mInterpolatedTime * (mDynamicMaxX - mDynamicMinX);

@@ -7,7 +7,7 @@
 
     <com.bezierdemo.ui.widget.BallLineView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="100dp"
         android:background="#777"
         setting:ballCount="5"
         setting:ballGap="1.0"
