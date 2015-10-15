@@ -1,6 +1,9 @@
 package com.bezierdemo.ui.widget;
 
+import com.bezierdemo.ui.R;
+
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -12,7 +15,16 @@ import android.view.animation.Animation;
 import android.view.animation.Transformation;
 
 public class BallLineView extends View {
-    private int mStaticBallCount = 4;
+    private static final int DEFAULT_COLOR = Color.BLUE;
+    private static final int DEFAULT_BALL_COUNT = 5;
+    private static final float DEFAULT_BALL_RATIO = 0.75f;
+    private static final float DEFAULT_BALL_GAP = 1.0f;
+
+    private int mStaticBallCount; // 静态圆的数目
+    private float mBallRatio; // 小圆与大圆的比例，0.5~1之间
+    private float mBallGap; // 两个静态圆之间的间距与静态圆的比例，mBallRatio~1.5之间
+    private int mBallColor;
+
     private Ball[] mStaticBalls;
     private Ball mDynamicBall = new Ball();
 
@@ -35,6 +47,24 @@ public class BallLineView extends View {
 
     public BallLineView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+
+        final TypedArray attributes = context.getTheme().obtainStyledAttributes(attrs, R.styleable.LineBalls,
+                defStyleAttr, 0);
+        mStaticBallCount = attributes.getInt(R.styleable.LineBalls_ballCount, DEFAULT_BALL_COUNT);
+        if (mStaticBallCount <= 0) {
+            mStaticBallCount = DEFAULT_BALL_COUNT;
+        }
+        mBallColor = attributes.getColor(R.styleable.LineBalls_ballColor, DEFAULT_COLOR);
+        mBallRatio = attributes.getFloat(R.styleable.LineBalls_ballRatio, DEFAULT_BALL_RATIO);
+        if (mBallRatio < 0.5 || mBallRatio > 1) {
+            mBallRatio = DEFAULT_BALL_RATIO;
+        }
+        mBallGap = attributes.getFloat(R.styleable.LineBalls_ballGap, DEFAULT_BALL_GAP);
+        if (mBallGap < mBallRatio || mBallGap > 1.5) {
+            mBallGap = DEFAULT_BALL_GAP;
+        }
+        attributes.recycle();
+
         initPaint();
     }
 
@@ -76,38 +106,39 @@ public class BallLineView extends View {
         int width = getWidth();
         int height = getHeight();
         float staticBallRadius;
-        // 静态小球横向排列，两个小球间距以及整体左右间距均为1.5个小球，
+        // 静态小球横向排列，两个小球间距以及整体左右间距相等，由mBallGap定义
         // 静态球计算半径的时候要综合考虑View的长和宽，还要考虑左右padding
-        int radiusCount = mStaticBallCount * 5 + 3; // 总距离等于半径的倍数
-        if (height / 2 * radiusCount < width - getPaddingLeft() - getPaddingRight()) {
+        float diameterCount = (mStaticBallCount + 1) * mBallGap + mStaticBallCount; // 总距离等于直径的倍数
+        if (height * diameterCount < width - getPaddingLeft() - getPaddingRight()) {
             staticBallRadius = height / 2;
         } else {
-            staticBallRadius = (float)(width - getPaddingLeft() - getPaddingRight()) / radiusCount;
+            staticBallRadius = (float) (width - getPaddingLeft() - getPaddingRight()) / diameterCount / 2;
         }
         mStaticBalls = new Ball[mStaticBallCount];
         for (int i = 0; i < mStaticBallCount; i++) {
             Ball ball = new Ball();
-            ball.x = getPaddingLeft() + staticBallRadius * (4 + i * 5);
+            ball.x = getPaddingLeft() + staticBallRadius * (2 * mBallGap * (i + 1) + i * 2 + 1);
             ball.y = height / 2;
             ball.radius = staticBallRadius;
             mStaticBalls[i] = ball;
         }
-        // 动态小球的默认半径是静态小球的3/4
-        mDynamicBall.radius = 3 * staticBallRadius / 4;
+        // 动态小球的半径
+        mDynamicBall.radius = staticBallRadius * mBallRatio;
 
         mDynamicBall.y = mStaticBalls[0].y;
         mDynamicMinX = getPaddingLeft() + mDynamicBall.radius;
-        mDynamicMaxX = getPaddingLeft() + staticBallRadius * (5 * mStaticBallCount + 3) - mDynamicBall.radius;
+        mDynamicMaxX = getPaddingLeft() + staticBallRadius
+                * (2 * mStaticBallCount + 2 * mBallGap * (mStaticBallCount + 1)) - mDynamicBall.radius;
     }
 
     private void initPaint() {
         mCirclePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mCirclePaint.setStyle(Paint.Style.FILL);
-        mCirclePaint.setColor(Color.RED);
+        mCirclePaint.setColor(mBallColor);
 
         mLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mLinePaint.setStyle(Paint.Style.FILL);
-        mLinePaint.setColor(Color.RED);
+        mLinePaint.setColor(mBallColor);
 
         mPath = new Path();
     }
@@ -124,7 +155,7 @@ public class BallLineView extends View {
             canvas.drawCircle(staticBall.x, staticBall.y, staticBall.radius, mCirclePaint);
 
             // 两个球有连接且不相交才绘制中间的连接曲线
-            if (isConnect(staticBall, mDynamicBall) && !isIntersect(staticBall, mDynamicBall)) {
+            if (isConnect(staticBall, mDynamicBall) && !isFullIntersect(staticBall, mDynamicBall)) {
                 float start1X = staticBall.x;
                 float start1Y = staticBall.y - staticBall.radius;
 
@@ -152,10 +183,10 @@ public class BallLineView extends View {
     }
 
     /**
-     * 两个小球是否相交
+     * 小球是否彻底进入大球了
      */
-    private boolean isIntersect(Ball a, Ball b) {
-        return Math.abs(a.x - b.x) < a.radius + b.radius;
+    private boolean isFullIntersect(Ball a, Ball b) {
+        return Math.abs(a.x - b.x) < Math.abs(a.radius - b.radius);
     }
 
     /**

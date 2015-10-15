@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="LineBalls">
+        <attr name="ballCount" format="integer" />
+        <attr name="ballRatio" format="float" />
+        <attr name="ballGap" format="float" />
+        <attr name="ballColor" format="color" />
+    </declare-styleable>
+
+</resources>
