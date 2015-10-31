@@ -2,5 +2,6 @@
 <resources>
 
     <string name="app_name">Bezier</string>
+    <string name="unread_count">99</string>
 
 </resources>
